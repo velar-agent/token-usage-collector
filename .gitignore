@@ -1,0 +1,5 @@
+.env
+*.key
+*key*.txt
+raw/
+processed/
