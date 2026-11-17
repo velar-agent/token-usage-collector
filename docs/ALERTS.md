@@ -21,7 +21,7 @@ status: open | recovered
 source: token usage logging bot | token usage gethering bot
 source_id: <uuid>
 time: <ISO 8601, +09:00>
-service: grok | codex | claude | antigravity | muse | pipeline
+service: codex | claude | antigravity | muse | grok-bot | pipeline
 problem_key: e.g. collect_fail:claude:401, log_script_error, no_new_raw_after_2_requests
 summary: <한국어 한 줄>
 detail: <what you saw, error text>
