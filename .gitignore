@@ -3,3 +3,6 @@
 *key*.txt
 raw/
 processed/
+__pycache__/
+*.pyc
+*.log
