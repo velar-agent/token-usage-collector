@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect subscription usage for grok, codex, claude, antigravity, muse, grok-bot into /workspace/token-usage/raw/
+# Collect subscription usage for grok, codex, claude, antigravity, muse into /workspace/token-usage/raw/
 export PATH=$HOME/.local/bin:$PATH
 S=/workspace/agent-scripts; R=/workspace/token-usage/raw; ts=$(date +%Y-%m-%d_%H%M); now=$(date -Iseconds)
 N='input_tokens:null,output_tokens:null,total_tokens:null,cost_usd:null'
@@ -9,5 +9,4 @@ codex(){ timeout 60 python3 $S/codex-account-rateLimits-read.py | jq -c --arg no
 claude(){ { $S/claude-usage.sh 2>/dev/null || { (cd /tmp && timeout 90 claude -p hi >/dev/null 2>&1); $S/claude-usage.sh; }; } | jq -c --arg now "$now" ".limits[] | {collected_at:\$now,service:\"claude\",model:(.scope.model.display_name // .scope.model.id // (if .kind==\"weekly_scoped\" then \"scoped\" else \"all models\" end)),period_start:null,period_end:.resets_at,$N,used_percent:(.percent|floor),limit_type:.kind,reset_at:.resets_at,source:\"claude-usage.sh\"}"; }
 agy(){ timeout 90 $S/agy-print-usage.sh --output-format-json | jq -c --arg now "$now" ".command.data.groups[] as \$g | \$g.buckets[] | {collected_at:\$now,service:\"antigravity\",model:\$g.name,period_start:null,period_end:.reset_time,$N,remaining_percent:(.remaining_fraction*100|floor),limit_type:(.window // \"weekly\"),reset_at:.reset_time,source:\"agy-print-usage.sh\"}"; }
 muse(){ timeout 20 "$(dirname "$(readlink -f "$0")")/muse-tui-warmup.py" 10 </dev/null >/dev/null 2>&1; $S/muse-usage.sh --json | jq -c --arg now "$now" ".allowance | select(.!=null) | .tier as \$t | [\"weekly\",\"window\"][] as \$k | select(.[\$k]!=null) | {collected_at:\$now,service:\"muse\",model:\$t,period_start:null,period_end:(.[\$k].resetsAtMs/1000|todate),$N,used_percent:(.[\$k].usedPercent|floor),limit_type:\$k,reset_at:(.[\$k].resetsAtMs/1000|todate),source:\"muse-usage.sh\"}"; }
-grokbot(){ local T; T=$($S/grok-bot-cursor-token-from-linux.sh) || return 1; GROK_BOT_ACCESS_TOKEN="$T" timeout 60 $S/grok-bot-cursor-usage.sh | jq -c --arg now "$now" "{collected_at:\$now,service:\"grok-bot\",model:(.grokPlanLabel // .includedUsageSuperGrokPlan),period_start:.currentPeriodStart,period_end:.nextResetTimestampUtc,$N,used_percent:(.usagePercent|floor),limit_type:\"weekly\",reset_at:.nextResetTimestampUtc,source:\"grok-bot-cursor-usage.sh\"}"; }
-run grok grok; run codex codex; run claude claude; run antigravity agy; run muse muse; run grok-bot grokbot
+run grok grok; run codex codex; run claude claude; run antigravity agy; run muse muse

@@ -1,6 +1,6 @@
 # token-usage-collector
 
-Collects subscription-limit usage for grok, codex, claude, antigravity, muse, and grok-bot,
+Collects subscription-limit usage for grok, codex, claude, antigravity, and muse,
 writing one JSONL file per service to `/workspace/token-usage/raw/<YYYY-MM-DD_HHMM>_<service>.jsonl`.
 
 - `bin/collect-all.sh` — main collector. Uses the scripts in
