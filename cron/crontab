@@ -1,0 +1,4 @@
+# 매 시 15분·45분(Asia/Seoul): 토큰 사용량 수집 → 대시보드 전송 → 알림 판단
+CRON_TZ=Asia/Seoul
+TZ=Asia/Seoul
+15,45 * * * * /workspace/token-usage-collector/cron/run.sh
