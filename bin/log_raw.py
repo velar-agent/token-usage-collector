@@ -1,36 +1,40 @@
 #!/usr/bin/env python3
 """Convert gathering-bot raw jsonl files into processed/YYYY-MM-DD.jsonl (FORMAT.md). Idempotent via .logged list."""
-import json, sys, urllib.request, urllib.error
+import json, os, sys, time, urllib.request, urllib.error
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
 KST = timezone(timedelta(hours=9))
 BASE = Path("/workspace/token-usage")
 DONE = BASE / ".logged"
 NOTE_MAP = {"X Premium+ (GrokBuild)": "GrokBuild"}
 POST = (BASE / ".post_enabled").exists()
-PROD = "https://usage-dashboard.velar-agent.workers.dev/api/ingest"
-DEV = "https://usage-dashboard-dev.velar-agent.workers.dev/api/ingest"
-def post_dev(recs, name):
-    """Best-effort mirror to the dev server; never blocks prod."""
-    try:
-        post(recs, DEV, "ingest-dev")
-    except Exception as e:
-        print(f"dev ingest failed ({name}): {type(e).__name__}: {e}")
-        with (BASE / ".dev_failed.log").open("a") as fl:
-            fl.write(f"{datetime.now(KST).isoformat()} {name} {type(e).__name__}: {e}\n")
-def post(recs, url=PROD, label="ingest"):
-    key = (BASE / "ingest-key.txt").read_text().strip()
+INGEST_URL = os.environ.get("INGEST_URL", "http://127.0.0.1:8787/api/ingest")
+INGEST_KEY_FILE = Path(os.environ.get("INGEST_KEY_FILE", BASE / "google-ingest-key.txt"))
+
+def post(recs):
+    host = unquote(urlsplit(INGEST_URL).hostname or "").lower().rstrip(".")
+    if host.split(".")[-2:] == ["workers", "dev"]:
+        raise ValueError("INGEST_URL must point to the Google dashboard")
+    key = INGEST_KEY_FILE.read_text().strip()
+    if not key:
+        raise ValueError(f"Ingest key file is empty: {INGEST_KEY_FILE}")
     for i in range(0, len(recs), 40):
-        req = urllib.request.Request(url, data=json.dumps(recs[i:i+40]).encode(), headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": "token-usage-logging-bot/1.0"}, method="POST")
+        req = urllib.request.Request(INGEST_URL, data=json.dumps(recs[i:i+40]).encode(), headers={"Content-Type": "application/json", "User-Agent": "token-usage-logging-bot/1.0"}, method="POST")
+        req.add_unredirected_header("Authorization", f"Bearer {key}")
         for attempt in range(3):
             try:
-                print(f"{label}:", urllib.request.urlopen(req, timeout=30).read().decode()); break
-            except urllib.error.HTTPError as e:
-                if e.code < 500 or attempt == 2: raise
-                import time; time.sleep(3)
-            except Exception:
-                if attempt == 2: raise
-                import time; time.sleep(3)
+                response = urllib.request.urlopen(req, timeout=30).read().decode()
+                print("ingest:", response.replace(key, "[redacted]") if key else response)
+                break
+            except Exception as e:
+                if attempt == 2 or (isinstance(e, urllib.error.HTTPError) and e.code < 500):
+                    if key and key in str(e):
+                        raise RuntimeError("Ingest request failed (details redacted)") from None
+                    raise
+                time.sleep(3)
+
 done = set(DONE.read_text().split()) if DONE.exists() else set()
 def kst(s):
     if not s: return None
@@ -64,7 +68,6 @@ for f in files:
         filerecs += recs
     if POST and filerecs:
         post(filerecs)
-        post_dev(filerecs, f.name)
     for x in filerecs:
         out = BASE/"processed"/f"{x['ts'][:10]}.jsonl"
         out.parent.mkdir(parents=True, exist_ok=True)
