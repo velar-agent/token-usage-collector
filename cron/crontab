@@ -1,4 +1,4 @@
-# 매 시 15분·45분(Asia/Seoul): 토큰 사용량 수집 → 대시보드 전송
+# Asia/Seoul 기준으로 5분마다 토큰 사용량을 수집해 대시보드로 보내요.
 CRON_TZ=Asia/Seoul
 TZ=Asia/Seoul
-15,45 * * * * /workspace/token-usage-collector/cron/run.sh
+*/5 * * * * /workspace/token-usage-collector/cron/run.sh

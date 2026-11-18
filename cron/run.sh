@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 매 시 15분·45분마다: 토큰 사용량 수집(collect-all.sh) → 대시보드 전송(log_raw.py)
+# 5분마다 collect-all.sh 로 토큰 사용량을 수집하고 log_raw.py 로 대시보드에 보내요.
 # 겹쳐 실행되지 않게 flock 으로 막고, 결과는 logs/YYYY-MM-DD.log 에 남겨요.
+# 한 번의 실행이 5분을 넘기면 겹치는 회차는 SKIP 을 남기고 건너뛰어요.
 set -u
 export TZ=Asia/Seoul PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)   # 코드 위치(저장소 cron/)
