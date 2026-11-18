@@ -12,21 +12,23 @@ NOTE_MAP = {"X Premium+ (GrokBuild)": "GrokBuild"}
 POST = (BASE / ".post_enabled").exists()
 INGEST_URL = os.environ.get("INGEST_URL", "http://127.0.0.1:8787/api/ingest")
 INGEST_KEY_FILE = Path(os.environ.get("INGEST_KEY_FILE", BASE / "google-ingest-key.txt"))
+INGEST_PROD_URL = os.environ.get("INGEST_PROD_URL", "http://127.0.0.1:8788/api/ingest")
+INGEST_PROD_KEY_FILE = Path(os.environ.get("INGEST_PROD_KEY_FILE", BASE / "google-ingest-key-prod.txt"))
 
-def post(recs):
-    host = unquote(urlsplit(INGEST_URL).hostname or "").lower().rstrip(".")
+def _post_to(url, key_file, recs):
+    host = unquote(urlsplit(url).hostname or "").lower().rstrip(".")
     if host.split(".")[-2:] == ["workers", "dev"]:
-        raise ValueError("INGEST_URL must point to the Google dashboard")
-    key = INGEST_KEY_FILE.read_text().strip()
+        raise ValueError(f"Ingest URL must point to the Google dashboard: {url}")
+    key = Path(key_file).read_text().strip()
     if not key:
-        raise ValueError(f"Ingest key file is empty: {INGEST_KEY_FILE}")
+        raise ValueError(f"Ingest key file is empty: {key_file}")
     for i in range(0, len(recs), 40):
-        req = urllib.request.Request(INGEST_URL, data=json.dumps(recs[i:i+40]).encode(), headers={"Content-Type": "application/json", "User-Agent": "token-usage-logging-bot/1.0"}, method="POST")
+        req = urllib.request.Request(url, data=json.dumps(recs[i:i+40]).encode(), headers={"Content-Type": "application/json", "User-Agent": "token-usage-logging-bot/1.0"}, method="POST")
         req.add_unredirected_header("Authorization", f"Bearer {key}")
         for attempt in range(3):
             try:
                 response = urllib.request.urlopen(req, timeout=30).read().decode()
-                print("ingest:", response.replace(key, "[redacted]") if key else response)
+                print(f"ingest to {url}:", response.replace(key, "[redacted]") if key else response)
                 break
             except Exception as e:
                 if attempt == 2 or (isinstance(e, urllib.error.HTTPError) and e.code < 500):
@@ -34,6 +36,25 @@ def post(recs):
                         raise RuntimeError("Ingest request failed (details redacted)") from None
                     raise
                 time.sleep(3)
+
+def post(recs):
+    # dev와 prod에 독립적으로 보내요. 한쪽 실패가 다른 쪽 시도를 막지 않아요.
+    # 둘 다 시도한 뒤 하나라도 실패했으면 예외를 올려 .logged를 남기지 않고 다음 회차에 재시도해요.
+    # 서버는 INSERT OR IGNORE(dedupe_key)라 재전송은 idempotent해요.
+    errors = []
+    for url, key_file in ((INGEST_URL, INGEST_KEY_FILE), (INGEST_PROD_URL, INGEST_PROD_KEY_FILE)):
+        try:
+            _post_to(url, key_file, recs)
+        except Exception as e:
+            try:
+                k = Path(key_file).read_text().strip()
+            except Exception:
+                k = ""
+            msg = str(e).replace(k, "[redacted]") if k and k in str(e) else str(e)
+            print(f"ingest to {url} failed: {msg}", file=sys.stderr)
+            errors.append(e)
+    if errors:
+        raise RuntimeError(f"Ingest failed for {len(errors)} target(s)")
 
 done = set(DONE.read_text().split()) if DONE.exists() else set()
 def kst(s):

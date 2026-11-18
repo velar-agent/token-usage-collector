@@ -1,11 +1,13 @@
 # 토큰 사용 기록 보내기 / Posting token usage records
 
-Google VM 안에서 대시보드 주소는 `http://127.0.0.1:8787`이에요. Cloudflare 대시보드는 운영을 종료했어요.
-On the Google VM, the dashboard listens at `http://127.0.0.1:8787`. The Cloudflare dashboard has been retired.
+Google VM 안에서 대시보드 주소는 개발(dev) `http://127.0.0.1:8787`과 운영(prod) `http://127.0.0.1:8788`예요. 수집기(`bin/log_raw.py`)는 매 배치를 두 대시보드에 각각 보내요. 한쪽만 실패해도 다른 쪽은 끝까지 시도하고, 어느 쪽이든 실패하면 그 파일은 다음 실행에서 다시 보내요(서버 쪽 중복 제거로 안전해요). 아래 예시는 개발(dev) 기준이에요. Cloudflare 대시보드는 운영을 종료했어요.
+On the Google VM, the dashboards listen at `http://127.0.0.1:8787` (dev) and `http://127.0.0.1:8788` (prod). The collector (`bin/log_raw.py`) posts each batch to both. One target's failure still attempts the other, and any failure retries the file next run (re-sending is safe). Examples below target dev. The Cloudflare dashboard has been retired.
 
-- `INGEST_URL` 기본값 / Default POST URL — `http://127.0.0.1:8787/api/ingest`
+- `INGEST_URL` 기본값 / Default POST URL (dev) — `http://127.0.0.1:8787/api/ingest`
+- `INGEST_PROD_URL` 기본값 / Default POST URL (prod) — `http://127.0.0.1:8788/api/ingest`
 - 인증 / Auth: 헤더 `Authorization: Bearer <INGEST_KEY>`
-- `INGEST_KEY_FILE` 기본값 / Default key file — `/workspace/token-usage/google-ingest-key.txt` (권한 600, 채팅·로그에 키를 찍지 마세요 / never print or log the key)
+- `INGEST_KEY_FILE` 기본값 / Default key file (dev) — `/workspace/token-usage/google-ingest-key.txt` (권한 600, 채팅·로그에 키를 찍지 마세요 / never print or log the key)
+- `INGEST_PROD_KEY_FILE` 기본값 / Default key file (prod) — `/workspace/token-usage/google-ingest-key-prod.txt` (권한 600)
 - 본문 / Body: `Content-Type: application/json` — 기록 객체 하나, 객체 배열, 또는 `{"records":[...]}`. **한 번에 최대 40건 / max 40 records per request**, 본문 256KB 이하.
 
 ## 필드 / Fields (FORMAT.md 와 같아요 / same as FORMAT.md)

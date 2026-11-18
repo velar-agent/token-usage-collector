@@ -8,7 +8,7 @@ codex, claude, antigravity, muse, grok-bot 의 구독 한도 사용량을 모아
   - claude: 실패하면 CLI 토큰을 갱신(`claude -p hi`)하고 한 번 더 시도해요.
   - muse: 사용량을 읽기 전에 muse TUI(`bin/muse-tui-warmup.py`, ember/minimal, 프롬프트 "hi")를 가상 터미널에서 10초간 띄워요. 헤드리스 `muse exec` 만으로는 사용량 창이 안 열릴 수 있어서예요.
 - `bin/log_raw.py` — raw 파일을 대시보드 기록으로 바꿔 POST 해요(`docs/FORMAT.md`, `docs/INGEST.md` 참고).
-  Google VM 안에서 대시보드 주소는 `http://127.0.0.1:8787`이고 기본 키 파일은 `/workspace/token-usage/google-ingest-key.txt`예요. Cloudflare 대시보드는 운영을 종료했어요.
+  Google VM 안에서 매 배치를 개발(dev, `http://127.0.0.1:8787`)과 운영(prod, `http://127.0.0.1:8788`) 두 대시보드에 보내요. 기본 키 파일은 각각 `/workspace/token-usage/google-ingest-key.txt`와 `/workspace/token-usage/google-ingest-key-prod.txt`예요(`INGEST_URL`/`INGEST_KEY_FILE`, `INGEST_PROD_URL`/`INGEST_PROD_KEY_FILE` 환경 변수로 바꿀 수 있어요). 한쪽만 실패해도 다른 쪽은 끝까지 시도하고, 어느 쪽이든 실패하면 그 파일은 다음 실행에서 다시 보내요(서버 쪽 중복 제거로 안전해요). Cloudflare 대시보드는 운영을 종료했어요.
   `/workspace/token-usage/log_raw.py` 는 이 파일을 가리키는 심볼릭 링크예요.
 - `docs/FORMAT.md` — 기록 형식. `docs/INGEST.md` — 대시보드 전송 API.
 
