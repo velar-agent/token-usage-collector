@@ -10,15 +10,30 @@ BASE = Path("/workspace/token-usage")
 DONE = BASE / ".logged"
 NOTE_MAP = {"X Premium+ (GrokBuild)": "GrokBuild"}
 POST = (BASE / ".post_enabled").exists()
-INGEST_URL = os.environ.get("INGEST_URL", "http://127.0.0.1:8787/api/ingest")
+INGEST_URL = os.environ.get("INGEST_URL", "https://usage-dashboard-dev.velar-agent.duckdns.org/api/ingest")
 INGEST_KEY_FILE = Path(os.environ.get("INGEST_KEY_FILE", BASE / "google-ingest-key.txt"))
-INGEST_PROD_URL = os.environ.get("INGEST_PROD_URL", "http://127.0.0.1:8788/api/ingest")
+INGEST_PROD_URL = os.environ.get("INGEST_PROD_URL", "https://usage-dashboard.velar-agent.duckdns.org/api/ingest")
 INGEST_PROD_KEY_FILE = Path(os.environ.get("INGEST_PROD_KEY_FILE", BASE / "google-ingest-key-prod.txt"))
 
-def _post_to(url, key_file, recs):
-    host = unquote(urlsplit(url).hostname or "").lower().rstrip(".")
+def check_ingest_url(url):
+    """Ingest는 https만 허용해요. https가 아니면 키를 읽기 전에 거부해요."""
+    parts = urlsplit(url)
+    if parts.scheme.lower() != "https":
+        raise ValueError(f"Ingest URL must use https (plain http is refused): {url}")
+    host = unquote(parts.hostname or "").lower().rstrip(".")
     if host.split(".")[-2:] == ["workers", "dev"]:
         raise ValueError(f"Ingest URL must point to the Google dashboard: {url}")
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """리다이렉트를 따라가지 않아요. Authorization 헤더가 리다이렉트 목적지로 새지 않게 해요."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, f"refusing to follow redirect to {newurl}", headers, fp)
+
+# TLS 인증서 검증은 기본 opener 그대로 해요(끄지 않아요). 리다이렉트만 차단해요.
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect())
+
+def _post_to(url, key_file, recs):
+    check_ingest_url(url)
     key = Path(key_file).read_text().strip()
     if not key:
         raise ValueError(f"Ingest key file is empty: {key_file}")
@@ -27,7 +42,7 @@ def _post_to(url, key_file, recs):
         req.add_unredirected_header("Authorization", f"Bearer {key}")
         for attempt in range(3):
             try:
-                response = urllib.request.urlopen(req, timeout=30).read().decode()
+                response = _NO_REDIRECT_OPENER.open(req, timeout=30).read().decode()
                 print(f"ingest to {url}:", response.replace(key, "[redacted]") if key else response)
                 break
             except Exception as e:

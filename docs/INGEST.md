@@ -1,10 +1,10 @@
 # 토큰 사용 기록 보내기 / Posting token usage records
 
-Google VM 안에서 대시보드 주소는 개발(dev) `http://127.0.0.1:8787`과 운영(prod) `http://127.0.0.1:8788`예요. 수집기(`bin/log_raw.py`)는 매 배치를 두 대시보드에 각각 보내요. 한쪽만 실패해도 다른 쪽은 끝까지 시도하고, 어느 쪽이든 실패하면 그 파일은 다음 실행에서 다시 보내요(서버 쪽 중복 제거로 안전해요). 아래 예시는 개발(dev) 기준이에요. Cloudflare 대시보드는 운영을 종료했어요.
-On the Google VM, the dashboards listen at `http://127.0.0.1:8787` (dev) and `http://127.0.0.1:8788` (prod). The collector (`bin/log_raw.py`) posts each batch to both. One target's failure still attempts the other, and any failure retries the file next run (re-sending is safe). Examples below target dev. The Cloudflare dashboard has been retired.
+Google VM 안에서 데이터 전송은 https 전용이에요. 개발(dev)은 `https://usage-dashboard-dev.velar-agent.duckdns.org`, 운영(prod)은 `https://usage-dashboard.velar-agent.duckdns.org`예요. 수집기(`bin/log_raw.py`)는 매 배치를 두 대시보드에 각각 보내요. 한쪽만 실패해도 다른 쪽은 끝까지 시도하고, 어느 쪽이든 실패하면 그 파일은 다음 실행에서 다시 보내요(서버 쪽 중복 제거로 안전해요). 아래 예시는 개발(dev) 기준이에요. plain http(`http://`)는 수집기가 거부해요. Cloudflare 대시보드는 운영을 종료했어요.
+On the Google VM, data transfer is https only: dev `https://usage-dashboard-dev.velar-agent.duckdns.org` and prod `https://usage-dashboard.velar-agent.duckdns.org`. The collector (`bin/log_raw.py`) posts each batch to both. One target's failure still attempts the other, and any failure retries the file next run (re-sending is safe). Examples below target dev. Plain http is refused by the collector. The Cloudflare dashboard has been retired.
 
-- `INGEST_URL` 기본값 / Default POST URL (dev) — `http://127.0.0.1:8787/api/ingest`
-- `INGEST_PROD_URL` 기본값 / Default POST URL (prod) — `http://127.0.0.1:8788/api/ingest`
+- `INGEST_URL` 기본값 / Default POST URL (dev) — `https://usage-dashboard-dev.velar-agent.duckdns.org/api/ingest`
+- `INGEST_PROD_URL` 기본값 / Default POST URL (prod) — `https://usage-dashboard.velar-agent.duckdns.org/api/ingest`
 - 인증 / Auth: 헤더 `Authorization: Bearer <INGEST_KEY>`
 - `INGEST_KEY_FILE` 기본값 / Default key file (dev) — `/workspace/token-usage/google-ingest-key.txt` (권한 600, 채팅·로그에 키를 찍지 마세요 / never print or log the key)
 - `INGEST_PROD_KEY_FILE` 기본값 / Default key file (prod) — `/workspace/token-usage/google-ingest-key-prod.txt` (권한 600)
@@ -30,7 +30,7 @@ Records with the same `ts`+`service`+`metric`+`note` are stored once; re-sending
 ## 예 1: 한 건 / one record
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8787/api/ingest \
+curl -sS -X POST https://usage-dashboard-dev.velar-agent.duckdns.org/api/ingest \
   -H "Authorization: Bearer $(cat /workspace/token-usage/google-ingest-key.txt)" \
   -H "Content-Type: application/json" \
   -d '{"ts":"2026-11-15T15:20:00+09:00","service":"grok","metric":"weekly_used_pct","value":7,"unit":"%","reset_at":"2026-11-17T15:42:00+09:00","note":"X Premium+","source":"token-usage-logging-bot"}'
@@ -39,7 +39,7 @@ curl -sS -X POST http://127.0.0.1:8787/api/ingest \
 ## 예 2: 여러 건 / several records
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8787/api/ingest \
+curl -sS -X POST https://usage-dashboard-dev.velar-agent.duckdns.org/api/ingest \
   -H "Authorization: Bearer $(cat /workspace/token-usage/google-ingest-key.txt)" \
   -H "Content-Type: application/json" \
   -d '[{"service":"claude","metric":"session_used_pct","value":0,"unit":"%","note":"all models"},
@@ -56,7 +56,7 @@ key = open("/workspace/token-usage/google-ingest-key.txt").read().strip()
 recs = [{"ts": datetime.now(KST).isoformat(timespec="seconds"), "service": "codex",
          "metric": "weekly_used_pct", "value": 36, "unit": "%", "note": "ChatGPT prolite",
          "source": "token-usage-logging-bot"}]
-req = urllib.request.Request("http://127.0.0.1:8787/api/ingest", data=json.dumps(recs).encode(),
+req = urllib.request.Request("https://usage-dashboard-dev.velar-agent.duckdns.org/api/ingest", data=json.dumps(recs).encode(),
       headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                "User-Agent": "token-usage-logging-bot/1.0"}, method="POST")
 print(urllib.request.urlopen(req, timeout=30).read().decode())
@@ -72,7 +72,7 @@ print(urllib.request.urlopen(req, timeout=30).read().decode())
 ## 원본(raw) 파일 올리기 (선택) / Uploading a raw dump (optional)
 
 ```bash
-python3 - <<'PY' | curl -sS -X POST http://127.0.0.1:8787/api/raw/upload \
+python3 - <<'PY' | curl -sS -X POST https://usage-dashboard-dev.velar-agent.duckdns.org/api/raw/upload \
   -H "Authorization: Bearer $(cat /workspace/token-usage/google-ingest-key.txt)" -H "Content-Type: application/json" --data-binary @-
 import json; print(json.dumps({"name":"2026-11-15_1800_grok.jsonl","content":open("/workspace/token-usage/raw/2026-11-15_1800_grok.jsonl").read()}))
 PY
