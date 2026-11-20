@@ -42,6 +42,8 @@ Recommended fields. All are optional; missing fields are tolerated and unknown f
   Prefer **used** percentages (`weekly_used_pct`). If a source reports remaining percent (Codex, Gemini), convert with `100 - remaining` before writing.
 - Claude처럼 세션 한도와 주간 한도가 함께 있으면 각각 다른 `metric`으로 한 줄씩 적습니다 (`session_used_pct`, `weekly_used_pct`). 모델별 한도는 `note`에 모델명을 넣거나 `metric`을 구분해 적습니다.
   If a service has both session and weekly limits (e.g. Claude, Muse), write one line per metric.
+- 사용량 값을 받지 못한 관측(예: Muse `server_sent_no_usage`)은 `metric`을 `usage_unavailable`, `value`를 `0`으로 적고, `reason`(및 선택 `hint`)에 사유를 남겨요. `value`가 0이어도 사용률 0%가 아니에요. 한도 소진 여부는 대시보드가 이 기록과 직전 주간 사용률로 평가해요.
+  When a service returns no usage data (e.g. Muse `server_sent_no_usage`), write `metric` `usage_unavailable` with `value` 0 and a `reason` (optional `hint`). `value` 0 is not 0% used. The dashboard evaluates quota-exhausted state from this observation plus the last real weekly reading.
 - 같은 시각에 여러 지표를 남길 때는 줄을 여러 개 추가하면 됩니다. / Write one line per metric even if they share the same `ts`.
 
 ## 예제 한 줄 / Example line

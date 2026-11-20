@@ -96,6 +96,10 @@ for f in files:
             if float(pct).is_integer(): pct = int(pct)
         if pct is not None:
             recs.append({**base, "metric": f"{lt}_used_pct", "value": pct, "unit": "%", **extra})
+        elif r.get("reason"):
+            # 사용량 없음 관측. value는 ingest가 숫자를 요구해서 0으로 두고, 의미는 metric/reason에 있어요.
+            missing = {k: v for k, v in {"reason": r.get("reason"), "hint": r.get("hint")}.items() if v}
+            recs.append({**base, "metric": "usage_unavailable", "value": 0, **extra, **missing})
         for k, m, u in [("input_tokens","tokens_in","tokens"),("output_tokens","tokens_out","tokens"),("total_tokens","tokens_total","tokens"),("cost_usd","cost","USD")]:
             if r.get(k) is not None:
                 recs.append({**base, "metric": m, "value": r[k], "unit": u, **extra})

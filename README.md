@@ -6,7 +6,7 @@ codex, claude, antigravity, muse, grok-bot 의 구독 한도 사용량을 모아
 - `bin/collect-all.sh` — 수집 본체. [velar-agent/agent-scripts](https://github.com/velar-agent/agent-scripts) 의 스크립트를 써요(`/workspace/agent-scripts` 에 있어야 해요).
   서비스마다 `OK <file>` 또는 `FAIL <service>: <error>` 를 출력해요. 하나라도 실패하면 `collect-all.sh`는 0이 아닌 코드로 끝나요.
   - claude: 실패하면 CLI 토큰을 갱신(`claude -p hi`)하고 한 번 더 시도해요.
-  - muse: `bin/muse-collect.py`가 사용량을 모아요. 직전 성공 기록이 주간 한도 99% 이상이고 주간 리셋 전이면 `server_sent_no_usage`는 정상이에요. TUI warmup(`hi`)을 건너뛰고 주간 사용량 100%와 기존 리셋 시각을 기록한 뒤 `OK muse exhausted until <리셋 KST>`를 남겨요. 리셋이 지나면 다시 워밍업하고 실제 사용량을 읽어요. 그 밖의 no-usage는 이유·힌트와 함께 `FAIL`이에요.
+  - muse: `bin/muse-collect.py`가 사용량을 모아요. 매번 muse TUI(`bin/muse-tui-warmup.py`, ember/minimal, 프롬프트 "hi")를 가상 터미널에서 10초간 띄운 뒤 `muse usage`를 읽어요. 서버가 사용량을 안 보내면(`server_sent_no_usage`) 실패로 치지 않고, `used_percent`는 null, `reason`·`hint`와 시각을 raw에 그대로 남겨요. 한도 소진 여부는 대시보드가 평가해요. CLI·파싱 오류만 `FAIL`이에요.
 - `bin/log_raw.py` — raw 파일을 대시보드 기록으로 바꿔 POST 해요(`docs/FORMAT.md`, `docs/INGEST.md` 참고).
   Google VM 안에서 매 배치를 개발(dev, `https://usage-dashboard-dev.velar-agent.duckdns.org`)과 운영(prod, `https://usage-dashboard.velar-agent.duckdns.org`) 두 대시보드에 보내요. 데이터 전송은 https 전용이라 plain http는 거부해요. 기본 키 파일은 각각 `/workspace/token-usage/google-ingest-key.txt`와 `/workspace/token-usage/google-ingest-key-prod.txt`예요(`INGEST_URL`/`INGEST_KEY_FILE`, `INGEST_PROD_URL`/`INGEST_PROD_KEY_FILE` 환경 변수로 바꿀 수 있어요). 한쪽만 실패해도 다른 쪽은 끝까지 시도하고, 어느 쪽이든 실패하면 그 파일은 다음 실행에서 다시 보내요(서버 쪽 중복 제거로 안전해요). Cloudflare 대시보드는 운영을 종료했어요.
   `/workspace/token-usage/log_raw.py` 는 이 파일을 가리키는 심볼릭 링크예요.
